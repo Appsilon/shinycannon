@@ -77,6 +77,7 @@ fun servedBy(resp: HttpResponse): AppServer {
         headers["X-Powered-By"] == "Shiny Server Pro" -> AppServer.SSP
         headers.containsKey("rscid") -> AppServer.RSC
         headers["Server"]?.startsWith("RStudio Connect") ?: false -> AppServer.RSC
+        resp.cookies.cookies.any { it.name == "rscid" } -> AppServer.RSC
         else -> AppServer.UNKNOWN
     }
 }
@@ -97,15 +98,20 @@ fun getInputs(resp: HttpResponse, server: AppServer): Map<String, String> {
 
 fun loginUrlFor(appUrl: String, server: AppServer): String {
     return when (server) {
-        AppServer.RSC -> URL(appUrl).let { url ->
-            URIBuilderTiny()
-                    .setScheme(url.protocol)
-                    .setHost(url.host)
-                    .setPort(url.port)
-                    .appendPaths("__login__")
-                    .build()
-                    .toString()
+        AppServer.RSC -> {
+            val url = URIBuilderTiny(appUrl)
+            // If there are more path components than e.g. "content/1234", Connect must be behind a reverse proxy
+            // and mounted at some sub-path. In that case, __login__ must be appended to that path.
+            val loginPath = if (url.paths.size > 2) {
+                // Drop "content/1234" or similar from the paths and append __login__
+                url.paths.dropLast(2) + "__login__"
+            } else {
+                // The only path component should be __login__
+                mutableListOf("__login__")
+            }
+            url.setPaths(loginPath).build().toString()
         }
+        // TODO Determine if there's a reliable way to detect SSP login path even when proxied
         AppServer.SSP -> URIBuilderTiny(appUrl)
                 .appendPaths("__login__")
                 .build()
