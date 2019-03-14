@@ -79,6 +79,7 @@ sealed class Event(open val begin: Long, open val lineNumber: Int) {
             val obj = JsonParser().parse(line).asJsonObject
             val begin = parseInstant(obj.get("begin").asString)
             val type = obj.get("type").asString
+
             return when (type) {
                 "REQ_GET" -> Http.REQ_GET(begin,
                         lineNumber,
@@ -250,7 +251,6 @@ sealed class Event(open val begin: Long, open val lineNumber: Int) {
                   val url: String) : Event(begin, lineNumber) {
         override fun handle(session: ShinySession, out: PrintWriter) {
             check(session.webSocket == null) { "Tried to WS_OPEN but already have a websocket" }
-
             withLog(session, out) {
                 val wsUrl = session.wsUrl + session.replaceTokens(url)
                 session.webSocket = WebSocketFactory().createSocket(wsUrl).also {
@@ -397,6 +397,7 @@ sealed class Event(open val begin: Long, open val lineNumber: Int) {
                 begin - (session.lastEventEnded ?: begin)
 
         override fun handle(session: ShinySession, out: PrintWriter) {
+
             withLog(session, out) {
                 val text = session.replaceTokens(message)
                 session.webSocket!!.sendText(text)
